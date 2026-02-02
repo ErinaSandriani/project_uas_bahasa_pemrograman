@@ -10,19 +10,17 @@ BARANG_FILE = "barang.csv"
 TRANSAKSI_FILE = "transaksi.csv"
 
 # =====================
-# INIT FILE JIKA BELUM ADA
+# INIT FILE
 # =====================
 if not os.path.exists(BARANG_FILE):
-    df_barang = pd.DataFrame(columns=[
+    pd.DataFrame(columns=[
         "Kode Barang", "Nama Barang", "Harga Beli", "Harga Jual", "Stok"
-    ])
-    df_barang.to_csv(BARANG_FILE, index=False)
+    ]).to_csv(BARANG_FILE, index=False)
 
 if not os.path.exists(TRANSAKSI_FILE):
-    df_transaksi = pd.DataFrame(columns=[
+    pd.DataFrame(columns=[
         "Kode Transaksi", "Tanggal", "Jenis Transaksi", "Kode Barang", "Jumlah"
-    ])
-    df_transaksi.to_csv(TRANSAKSI_FILE, index=False)
+    ]).to_csv(TRANSAKSI_FILE, index=False)
 
 # =====================
 # FUNCTION LOAD DATA
@@ -50,7 +48,8 @@ if menu == "Data Barang":
     st.header("📋 Manajemen Data Barang")
     df_barang = load_barang()
 
-    with st.form("form_barang"):
+    # ---- FORM TAMBAH BARANG ----
+    with st.form("form_tambah_barang"):
         kode = st.text_input("Kode Barang")
         nama = st.text_input("Nama Barang")
         harga_beli = st.number_input("Harga Beli", min_value=0)
@@ -64,17 +63,35 @@ if menu == "Data Barang":
             elif kode in df_barang["Kode Barang"].values:
                 st.error("Kode barang sudah ada")
             else:
-                new_data = {
+                df_barang = df_barang._append({
                     "Kode Barang": kode,
                     "Nama Barang": nama,
                     "Harga Beli": harga_beli,
                     "Harga Jual": harga_jual,
                     "Stok": stok
-                }
+                }, ignore_index=True)
 
-                df_barang = df_barang._append(new_data, ignore_index=True)
                 df_barang.to_csv(BARANG_FILE, index=False)
                 st.success("Barang berhasil ditambahkan")
+
+    st.divider()
+
+    # ---- HAPUS BARANG ----
+    st.subheader("🗑️ Hapus Barang")
+
+    if df_barang.empty:
+        st.info("Belum ada data barang")
+    else:
+        kode_hapus = st.selectbox(
+            "Pilih Kode Barang",
+            df_barang["Kode Barang"]
+        )
+
+        if st.button("Hapus Barang"):
+            df_barang = df_barang[df_barang["Kode Barang"] != kode_hapus]
+            df_barang.to_csv(BARANG_FILE, index=False)
+            st.success("Barang berhasil dihapus")
+            st.rerun()
 
     st.subheader("📦 Daftar Barang")
     st.dataframe(df_barang)
@@ -109,18 +126,16 @@ elif menu == "Transaksi":
                         else:
                             df_barang.loc[idx, "Stok"] += jumlah
 
-                        transaksi = {
+                        df_transaksi = df_transaksi._append({
                             "Kode Transaksi": kode_trx,
                             "Tanggal": datetime.now().strftime("%Y-%m-%d"),
                             "Jenis Transaksi": jenis,
                             "Kode Barang": kode_barang,
                             "Jumlah": jumlah
-                        }
+                        }, ignore_index=True)
 
-                        df_transaksi = df_transaksi._append(transaksi, ignore_index=True)
                         df_barang.to_csv(BARANG_FILE, index=False)
                         df_transaksi.to_csv(TRANSAKSI_FILE, index=False)
-
                         st.success("Transaksi berhasil disimpan")
                 except Exception as e:
                     st.error(f"Terjadi kesalahan: {e}")
@@ -129,7 +144,7 @@ elif menu == "Transaksi":
     st.dataframe(df_transaksi)
 
 # =====================
-# MENU LAPORAN & ANALISIS
+# MENU LAPORAN
 # =====================
 elif menu == "Laporan & Analisis":
     st.header("📊 Laporan & Analisis")
@@ -146,15 +161,14 @@ elif menu == "Laporan & Analisis":
         if not penjualan.empty:
             st.write(penjualan.sort_values(ascending=False))
         else:
-            st.info("Belum ada transaksi penjualan")
+            st.info("Belum ada penjualan")
 
         st.subheader("⚠️ Stok Terendah")
         st.write(df_barang.sort_values("Stok").head(3))
 
-        st.subheader("💸 Laba / Rugi")
         total_laba = 0
         for _, row in df_barang.iterrows():
             terjual = penjualan.get(row["Kode Barang"], 0)
             total_laba += terjual * (row["Harga Jual"] - row["Harga Beli"])
 
-        st.metric("Total Laba", f"Rp {total_laba:,.0f}")
+        st.metric("💸 Total Laba", f"Rp {total_laba:,.0f}")
